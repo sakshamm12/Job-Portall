@@ -11,13 +11,13 @@ export async function getCompanies(token) {
 
     if (error) {
       console.error("Error fetching Companies:", error);
-      throw new Error(`Failed to fetch companies: ${error.message}`);
+      return null;
     }
 
     return data;
   } catch (error) {
     console.error("Error in getCompanies:", error);
-    throw error;
+    return null;
   }
 }
 
@@ -26,11 +26,6 @@ export async function addNewCompany(token, _, companyData) {
   try {
     const supabase = await supabaseClient(token);
 
-    // Validate input
-    if (!companyData.name || !companyData.logo) {
-      throw new Error("Company name and logo are required");
-    }
-
     // Generate unique filename
     const timestamp = Date.now();
     const random = Math.floor(Math.random() * 90000);
@@ -38,46 +33,32 @@ export async function addNewCompany(token, _, companyData) {
     const fileName = `logo-${timestamp}-${random}-${companyData.name.replace(/[^a-zA-Z0-9]/g, '_')}.${fileExtension}`;
 
     // Upload logo to storage
-    const { data: uploadData, error: storageError } = await supabase.storage
+    const { error: storageError } = await supabase.storage
       .from("company-logos")
-      .upload(fileName, companyData.logo, {
-        cacheControl: '3600',
-        upsert: false
-      });
+      .upload(fileName, companyData.logo);
 
     if (storageError) {
       console.error("Storage error:", storageError);
-      throw new Error(`Error uploading company logo: ${storageError.message}`);
+      throw new Error("Error uploading Company Logo");
     }
 
     // Get public URL for the uploaded file
-    const { data: { publicUrl } } = supabase.storage
-      .from("company-logos")
-      .getPublicUrl(fileName);
+    const logo_url = `${supabaseUrl}/storage/v1/object/public/company-logos/${fileName}`;
 
     // Insert company record
     const { data, error } = await supabase
       .from("companies")
       .insert([
         {
-          name: companyData.name.trim(),
-          logo_url: publicUrl,
+          name: companyData.name,
+          logo_url: logo_url,
         },
       ])
       .select();
 
     if (error) {
-      // If company insert fails, try to clean up the uploaded file
-      try {
-        await supabase.storage
-          .from("company-logos")
-          .remove([fileName]);
-      } catch (cleanupError) {
-        console.warn("Failed to cleanup uploaded file:", cleanupError);
-      }
-      
       console.error("Database error:", error);
-      throw new Error(`Error creating company: ${error.message}`);
+      throw new Error("Error submitting Company");
     }
 
     return data;

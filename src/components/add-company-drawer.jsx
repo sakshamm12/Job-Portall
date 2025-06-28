@@ -16,7 +16,7 @@ import { useForm } from "react-hook-form";
 import useFetch from "@/hooks/use-fetch";
 import { addNewCompany } from "@/api/apiCompanies";
 import { BarLoader } from "react-spinners";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
 const schema = z.object({
   name: z.string().min(1, { message: "Company name is required" }),
@@ -25,30 +25,18 @@ const schema = z.object({
     .refine(
       (file) =>
         file[0] &&
-        (file[0].type === "image/png" || 
-         file[0].type === "image/jpeg" || 
-         file[0].type === "image/webp" ||
-         file[0].type === "image/svg+xml"),
+        (file[0].type === "image/png" || file[0].type === "image/jpeg"),
       {
-        message: "Only PNG, JPEG, WebP, and SVG images are allowed",
-      }
-    )
-    .refine(
-      (file) => file[0] && file[0].size <= 5 * 1024 * 1024, // 5MB limit
-      {
-        message: "File size must be less than 5MB",
+        message: "Only Images are allowed",
       }
     ),
 });
 
 const AddCompanyDrawer = ({ fetchCompanies }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  
   const {
     register,
     handleSubmit,
     formState: { errors },
-    reset,
   } = useForm({
     resolver: zodResolver(schema),
   });
@@ -61,27 +49,21 @@ const AddCompanyDrawer = ({ fetchCompanies }) => {
   } = useFetch(addNewCompany);
 
   const onSubmit = async (data) => {
-    try {
-      await fnAddCompany({
-        ...data,
-        logo: data.logo[0],
-      });
-    } catch (error) {
-      console.error("Error adding company:", error);
-    }
+    fnAddCompany({
+      ...data,
+      logo: data.logo[0],
+    });
   };
 
   useEffect(() => {
     if (dataAddCompany?.length > 0) {
       fetchCompanies();
-      reset();
-      setIsOpen(false);
     }
-  }, [dataAddCompany, fetchCompanies, reset]);
+  }, [loadingAddCompany]);
 
   return (
-    <Drawer open={isOpen} onOpenChange={setIsOpen}>
-      <DrawerTrigger asChild>
+    <Drawer>
+      <DrawerTrigger>
         <Button type="button" size="sm" variant="secondary">
           Add Company
         </Button>
@@ -90,31 +72,26 @@ const AddCompanyDrawer = ({ fetchCompanies }) => {
         <DrawerHeader>
           <DrawerTitle>Add a New Company</DrawerTitle>
         </DrawerHeader>
-        <form className="flex gap-2 p-4 pb-0" onSubmit={handleSubmit(onSubmit)}>
+        <form className="flex gap-2 p-4 pb-0">
           {/* Company Name */}
-          <Input 
-            placeholder="Company name" 
-            {...register("name")}
-            disabled={loadingAddCompany}
-          />
+          <Input placeholder="Company name" {...register("name")} />
 
           {/* Company Logo */}
           <Input
             type="file"
-            accept="image/png,image/jpeg,image/webp,image/svg+xml"
-            className="file:text-gray-500"
+            accept="image/*"
+            className=" file:text-gray-500"
             {...register("logo")}
-            disabled={loadingAddCompany}
           />
 
           {/* Add Button */}
           <Button
-            type="submit"
+            type="button"
+            onClick={handleSubmit(onSubmit)}
             variant="destructive"
             className="w-40"
-            disabled={loadingAddCompany}
           >
-            {loadingAddCompany ? "Adding..." : "Add"}
+            Add
           </Button>
         </form>
         <DrawerFooter>
@@ -125,7 +102,7 @@ const AddCompanyDrawer = ({ fetchCompanies }) => {
           )}
           {loadingAddCompany && <BarLoader width={"100%"} color="#36d7b7" />}
           <DrawerClose asChild>
-            <Button type="button" variant="secondary" disabled={loadingAddCompany}>
+            <Button type="button" variant="secondary">
               Cancel
             </Button>
           </DrawerClose>
